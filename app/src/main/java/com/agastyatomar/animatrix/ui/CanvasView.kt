@@ -1,85 +1,15 @@
 package com.agastyatomar.animatrix.ui
-
 import android.content.Context
 import android.graphics.*
 import android.view.MotionEvent
 import android.view.View
-import com.agastyatomar.animatrix.model.AnimationProject
-import com.agastyatomar.animatrix.model.Point
-import com.agastyatomar.animatrix.model.Stroke
-
-class CanvasView(context: Context) : View(context) {
-    var project: AnimationProject? = null
-    var brushColor = Color.WHITE
-    var brushWidth = 6f
-    var onStrokeFinished: (() -> Unit)? = null
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-    private var activeStroke: Stroke? = null
-
-    init { setBackgroundColor(Color.rgb(18, 21, 28)); isFocusable = true }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        val p = project ?: return
-        val layer = p.activeLayer() ?: return
-        if (!layer.visible) return
-        val frame = layer.frames.firstOrNull { it.index == p.currentFrame } ?: return
-        paint.alpha = (layer.opacity * 255).toInt().coerceIn(0, 255)
-        frame.strokes.forEach { stroke ->
-            paint.color = stroke.color
-            paint.strokeWidth = stroke.width
-            drawStroke(canvas, stroke)
-        }
-        activeStroke?.let {
-            paint.color = it.color
-            paint.strokeWidth = it.width
-            drawStroke(canvas, it)
-        }
-    }
-
-    private fun drawStroke(canvas: Canvas, stroke: Stroke) {
-        if (stroke.points.size == 1) {
-            val pt = stroke.points[0]
-            canvas.drawCircle(pt.x, pt.y, stroke.width / 2f, paint)
-            return
-        }
-        val path = Path()
-        stroke.points.firstOrNull()?.let { path.moveTo(it.x, it.y) }
-        for (i in 1 until stroke.points.size) {
-            val a = stroke.points[i - 1]
-            val b = stroke.points[i]
-            path.quadTo(a.x, a.y, (a.x + b.x) / 2f, (a.y + b.y) / 2f)
-        }
-        canvas.drawPath(path, paint)
-    }
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        val p = project ?: return true
-        val layer = p.activeLayer() ?: return true
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                p.ensureFrame(p.currentFrame)
-                activeStroke = Stroke(mutableListOf(Point(event.x, event.y)), brushColor, brushWidth)
-                invalidate()
-                return true
-            }
-            MotionEvent.ACTION_MOVE -> {
-                activeStroke?.points?.add(Point(event.x, event.y))
-                invalidate()
-                return true
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                activeStroke?.let { layer.frames.first { it.index == p.currentFrame }.strokes.add(it) }
-                activeStroke = null
-                onStrokeFinished?.invoke()
-                invalidate()
-                return true
-            }
-        }
-        return true
-    }
+import com.agastyatomar.animatrix.model.*
+class CanvasView(c:Context):View(c){
+ var project:AnimationProject?=null;var tool="pencil";var color=Color.WHITE;var size=6f;var changed:(()->Unit)?=null
+ private val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{style=Paint.Style.STROKE;strokeCap=Paint.Cap.ROUND;strokeJoin=Paint.Join.ROUND}
+ private var active:Stroke?=null
+ override fun onDraw(c:Canvas){super.onDraw(c);val x=project?:return;if(x.grid){p.color=Color.rgb(40,44,52);p.strokeWidth=1f;for(i in 0..width step 48)c.drawLine(i.toFloat(),0f,i.toFloat(),height.toFloat(),p);for(i in 0..height step 48)c.drawLine(0f,i.toFloat(),width.toFloat(),i.toFloat(),p)};val l=x.activeLayer()?:return;if(x.onionSkin){l.frames.firstOrNull{it.index==x.currentFrame-1}?.let{drawFrame(c,it,Color.argb(60,80,150,255))};l.frames.firstOrNull{it.index==x.currentFrame+1}?.let{drawFrame(c,it,Color.argb(60,255,120,80))}};l.frames.firstOrNull{it.index==x.currentFrame}?.let{drawFrame(c,it,null)};active?.let{drawStroke(c,it,null)}}
+ private fun drawFrame(c:Canvas,f:Frame,forced:Int?){f.strokes.forEach{drawStroke(c,it,forced)};f.vectors.forEach{v->p.color=forced?:v.color;p.alpha=if(forced!=null)forced ushr 24 else 255;p.strokeWidth=4f;if(v.type=="circle")c.drawOval(RectF(v.x,v.y,v.x+v.w,v.y+v.h),p)else if(v.type=="line")c.drawLine(v.x,v.y,v.x+v.w,v.y+v.h,p)else c.drawRect(RectF(v.x,v.y,v.x+v.w,v.y+v.h),p)};f.puppet.forEach{n->p.color=forced?:Color.YELLOW;p.alpha=255;c.drawCircle(n.x,n.y,n.radius,p)}}
+ private fun drawStroke(c:Canvas,s:Stroke,forced:Int?){p.color=forced?:s.color;p.alpha=if(forced!=null)forced ushr 24 else 255;p.strokeWidth=s.width;if(s.points.size==1){val q=s.points[0];c.drawCircle(q.x,q.y,s.width/2,p);return};val path=Path();path.moveTo(s.points[0].x,s.points[0].y);for(i in 1 until s.points.size){val a=s.points[i-1];val b=s.points[i];path.quadTo(a.x,a.y,(a.x+b.x)/2,(a.y+b.y)/2)};c.drawPath(path,p)}
+ override fun onTouchEvent(e:MotionEvent):Boolean{val x=project?:return true;val l=x.activeLayer()?:return true;if(l.locked)return true;when(e.actionMasked){MotionEvent.ACTION_DOWN->{if(tool=="puppet"){x.ensureFrame(x.currentFrame).puppet.add(PuppetNode(System.nanoTime().toString(),e.x,e.y));changed?.invoke();invalidate();return true};active=Stroke(mutableListOf(Point(e.x,e.y)),if(tool=="eraser")Color.TRANSPARENT else color,size,tool);invalidate()};MotionEvent.ACTION_MOVE->{active?.points?.add(Point(e.x,e.y));invalidate()};MotionEvent.ACTION_UP->{active?.let{s->val f=x.ensureFrame(x.currentFrame);if(tool=="rect"||tool=="circle"||tool=="line"){val a=s.points.first();val b=s.points.last();f.vectors.add(VectorObject(tool,a.x,a.y,b.x-a.x,b.y-a.y,color))}else if(tool=="eraser"){f.strokes.removeAll{q->q.points.any{a->active!!.points.any{b->kotlin.math.abs(a.x-b.x)<size*2&&kotlin.math.abs(a.y-b.y)<size*2}}}}else f.strokes.add(s)};active=null;changed?.invoke();invalidate()}};return true}
 }
