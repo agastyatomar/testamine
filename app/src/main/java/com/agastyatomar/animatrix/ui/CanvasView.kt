@@ -3,7 +3,12 @@ import android.content.Context
 import android.graphics.*
 import android.view.MotionEvent
 import android.view.View
-import com.agastyatomar.animatrix.model.*
+import com.agastyatomar.animatrix.model.AnimationProject
+import com.agastyatomar.animatrix.model.Frame
+import com.agastyatomar.animatrix.model.Point
+import com.agastyatomar.animatrix.model.PuppetNode
+import com.agastyatomar.animatrix.model.Stroke
+import com.agastyatomar.animatrix.model.VectorObject
 class CanvasView(c:Context):View(c){
  var project:AnimationProject?=null;var tool="pencil";var color=Color.WHITE;var size=6f;var changed:(()->Unit)?=null
  private val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{style=Paint.Style.STROKE;strokeCap=Paint.Cap.ROUND;strokeJoin=Paint.Join.ROUND}
